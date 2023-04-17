@@ -310,7 +310,9 @@ def build(args):
     # you should pass `num_classes` to be 2 (max_obj_id + 1).
     # For more details on this, check the following discussion
     # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
-    num_classes = 20 if args.dataset_file != 'coco' else 91
+    
+    # num_classes = 16 if args.dataset_file != 'coco' else 91 # Sanoojan: issue with loading classes
+    num_classes = 91
     if args.dataset_file == "coco_panoptic":
         # for panoptic, we just add a num_classes that is large enough to hold
         # max_obj_id + 1, but the exact value doesn't really matter
@@ -328,6 +330,13 @@ def build(args):
         num_queries=args.num_queries,
         aux_loss=args.aux_loss,
     )
+    #DC5
+    if args.backbone == 'resnet50':
+        path_to_load="/nfs/users/ext_sanoojan.baliah/Sanoojan/detr/pretrained/detr-r50-dc5-f0fb7ef5.pth" # for res50
+    elif args.backbone == 'resnet101':
+        path_to_load="/nfs/users/ext_sanoojan.baliah/Sanoojan/detr/pretrained/detr-r101-dc5-a2e86def.pth" # for res101
+    model.load_state_dict(torch.load(path_to_load, map_location='cpu')['model'], strict=True)
+    print("loaded pretrained model.....................................")
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
     matcher = build_matcher(args)

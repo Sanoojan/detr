@@ -13,6 +13,9 @@ from typing import Optional, List
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
+from tome.merge import bipartite_soft_matching, merge_source, merge_wavg
+from tome.utils import parse_r
+from tome.transformer_utils import MultiheadAttention1
 
 
 class Transformer(nn.Module):
@@ -53,10 +56,12 @@ class Transformer(nn.Module):
         mask = mask.flatten(1)
 
         tgt = torch.zeros_like(query_embed)
-        memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+        memory,pos_embed = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
-        return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
+        # h1,w1=24,16
+        # return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
+        return hs.transpose(1, 2), memory.permute(1, 2, 0)
 
 
 class TransformerEncoder(nn.Module):
@@ -74,13 +79,13 @@ class TransformerEncoder(nn.Module):
         output = src
 
         for layer in self.layers:
-            output = layer(output, src_mask=mask,
+            output,pos = layer(output, src_mask=mask,
                            src_key_padding_mask=src_key_padding_mask, pos=pos)
 
         if self.norm is not None:
             output = self.norm(output)
 
-        return output
+        return output,pos
 
 
 class TransformerDecoder(nn.Module):
@@ -107,7 +112,7 @@ class TransformerDecoder(nn.Module):
             output = layer(output, memory, tgt_mask=tgt_mask,
                            memory_mask=memory_mask,
                            tgt_key_padding_mask=tgt_key_padding_mask,
-                           memory_key_padding_mask=memory_key_padding_mask,
+                           memory_key_padding_mask=None,
                            pos=pos, query_pos=query_pos)
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
@@ -124,12 +129,18 @@ class TransformerDecoder(nn.Module):
         return output.unsqueeze(0)
 
 
+
+
 class TransformerEncoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", normalize_before=False):
+                 activation="relu", normalize_before=False,ToMe=True):
         super().__init__()
-        self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+        if ToMe:
+            self.self_attn = MultiheadAttention1(d_model, nhead, dropout=dropout)
+        else:
+            self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+        self.ToMe=ToMe
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
@@ -142,6 +153,16 @@ class TransformerEncoderLayer(nn.Module):
 
         self.activation = _get_activation_fn(activation)
         self.normalize_before = normalize_before
+        print("normalize_before: ", normalize_before)
+        self._tome_info = {
+        "r": [32],
+        "size": None,
+        "source": None,
+        "trace_source": True,
+        "prop_attn": True,
+        "class_token": False,
+        "distill_token": False,
+    }
 
     def with_pos_embed(self, tensor, pos: Optional[Tensor]):
         return tensor if pos is None else tensor + pos
@@ -152,14 +173,48 @@ class TransformerEncoderLayer(nn.Module):
                      src_key_padding_mask: Optional[Tensor] = None,
                      pos: Optional[Tensor] = None):
         q = k = self.with_pos_embed(src, pos)
-        src2 = self.self_attn(q, k, value=src, attn_mask=src_mask,
-                              key_padding_mask=src_key_padding_mask)[0]
+        if self.ToMe:
+            src2,_,Q,K,V = self.self_attn(q, k, value=src, attn_mask=src_mask,        
+                                      key_padding_mask=src_key_padding_mask)
+        else:
+            src2 = self.self_attn(q, k, value=src, attn_mask=src_mask,
+                                key_padding_mask=src_key_padding_mask)[0]
+
         src = src + self.dropout1(src2)
+
+        src=torch.permute(src, (1, 0,2))
+        pos=torch.permute(pos, (1, 0,2))
+        if self.ToMe:
+            # print("before_token_merge",src.shape)
+            metric=src
+            # r = self._tome_info["r"].pop(0)
+            r=32
+            if r > 0:
+                # Apply ToMe here
+                merge, _ = bipartite_soft_matching(
+                    metric,
+                    r,
+                    self._tome_info["class_token"],
+                    self._tome_info["distill_token"],
+                )
+                # if self._tome_info["trace_source"]:
+                #     self._tome_info["source"] = merge_source(
+                #         merge, x, self._tome_info["source"]
+                #     )
+                
+                # src, self._tome_info["size"] = merge_wavg(merge, src, self._tome_info["size"])
+                src, _ = merge_wavg(merge, src, self._tome_info["size"])
+                pos, _ = merge_wavg(merge, pos, self._tome_info["size"])
+        
+        # print("after_token_merge",src.shape)
+        src=torch.permute(src, (1, 0,2))
+        pos=torch.permute(pos, (1, 0,2))
+        # src=x  
         src = self.norm1(src)
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
         src = src + self.dropout2(src2)
         src = self.norm2(src)
-        return src
+        return src,pos
 
     def forward_pre(self, src,
                     src_mask: Optional[Tensor] = None,

@@ -15,15 +15,15 @@ import util.misc as utils
 from datasets import build_dataset, get_coco_api_from_dataset
 from engine import evaluate, train_one_epoch
 from models import build_model
-
+import sys
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
-    parser.add_argument('--lr', default=1e-4, type=float)
-    parser.add_argument('--lr_backbone', default=1e-5, type=float)
-    parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--lr', default=5e-5, type=float)
+    parser.add_argument('--lr_backbone', default=1e-6, type=float)
+    parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
-    parser.add_argument('--epochs', default=300, type=int)
+    parser.add_argument('--epochs', default=1000, type=int)
     parser.add_argument('--lr_drop', default=200, type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
@@ -79,12 +79,13 @@ def get_args_parser():
                         help="Relative classification weight of the no-object class")
 
     # dataset parameters
-    parser.add_argument('--dataset_file', default='coco')
+    parser.add_argument('--dataset_file', default='isaid_data')
     parser.add_argument('--coco_path', type=str)
+    parser.add_argument('--isaid_path', type=str,default="/nfs/projects/cv703/jazz-cvgroup-9")
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
 
-    parser.add_argument('--output_dir', default='',
+    parser.add_argument('--output_dir', default='./Outputs/debug/',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
@@ -223,6 +224,13 @@ def main(args):
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
+            # Enna Enna Kambikkatra vela ellam pakka vendiyatha iruku !!!
+            original_stdout = sys.stdout
+            with (output_dir / "eval-AP.txt").open("a") as f:
+                sys.stdout = f
+                print(f"Epoch:{epoch}")
+                coco_evaluator.summarize()
+                sys.stdout = original_stdout
 
             # for evaluation logs
             if coco_evaluator is not None:
