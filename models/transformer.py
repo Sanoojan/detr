@@ -16,7 +16,7 @@ from torch import nn, Tensor
 from tome.merge import bipartite_soft_matching, merge_source, merge_wavg
 from tome.utils import parse_r
 from tome.transformer_utils import MultiheadAttention1
-
+import pdb
 
 class Transformer(nn.Module):
 
@@ -59,7 +59,7 @@ class Transformer(nn.Module):
         memory,pos_embed = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
-        # h1,w1=24,16
+
         # return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
         return hs.transpose(1, 2), memory.permute(1, 2, 0)
 
@@ -78,9 +78,13 @@ class TransformerEncoder(nn.Module):
                 pos: Optional[Tensor] = None):
         output = src
 
-        for layer in self.layers:
+        for i,layer in enumerate(self.layers):
+            if i==5:
+                ToMe=False
+            else:
+                ToMe=False
             output,pos = layer(output, src_mask=mask,
-                           src_key_padding_mask=src_key_padding_mask, pos=pos)
+                           src_key_padding_mask=src_key_padding_mask, pos=pos,ToMe=ToMe)
 
         if self.norm is not None:
             output = self.norm(output)
@@ -107,7 +111,10 @@ class TransformerDecoder(nn.Module):
         output = tgt
 
         intermediate = []
-
+        # pdb.set_trace()
+        # if True in memory_key_padding_mask:
+        #     print("True in memory_key_padding_mask .................................")
+        #     exit()
         for layer in self.layers:
             output = layer(output, memory, tgt_mask=tgt_mask,
                            memory_mask=memory_mask,
@@ -116,7 +123,7 @@ class TransformerDecoder(nn.Module):
                            pos=pos, query_pos=query_pos)
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
-
+        # pdb.set_trace()
         if self.norm is not None:
             output = self.norm(output)
             if self.return_intermediate:
@@ -171,9 +178,10 @@ class TransformerEncoderLayer(nn.Module):
                      src,
                      src_mask: Optional[Tensor] = None,
                      src_key_padding_mask: Optional[Tensor] = None,
-                     pos: Optional[Tensor] = None):
+                     pos: Optional[Tensor] = None,
+                     ToMe=False):
         q = k = self.with_pos_embed(src, pos)
-        if self.ToMe:
+        if ToMe:
             src2,_,Q,K,V = self.self_attn(q, k, value=src, attn_mask=src_mask,        
                                       key_padding_mask=src_key_padding_mask)
         else:
@@ -184,11 +192,12 @@ class TransformerEncoderLayer(nn.Module):
 
         src=torch.permute(src, (1, 0,2))
         pos=torch.permute(pos, (1, 0,2))
-        if self.ToMe:
+        if ToMe:
+            
             # print("before_token_merge",src.shape)
             metric=src
             # r = self._tome_info["r"].pop(0)
-            r=32
+            r=160
             if r > 0:
                 # Apply ToMe here
                 merge, _ = bipartite_soft_matching(
@@ -206,7 +215,7 @@ class TransformerEncoderLayer(nn.Module):
                 src, _ = merge_wavg(merge, src, self._tome_info["size"])
                 pos, _ = merge_wavg(merge, pos, self._tome_info["size"])
         
-        # print("after_token_merge",src.shape)
+            # print("after_token_merge",src.shape)
         src=torch.permute(src, (1, 0,2))
         pos=torch.permute(pos, (1, 0,2))
         # src=x  
@@ -233,10 +242,10 @@ class TransformerEncoderLayer(nn.Module):
     def forward(self, src,
                 src_mask: Optional[Tensor] = None,
                 src_key_padding_mask: Optional[Tensor] = None,
-                pos: Optional[Tensor] = None):
+                pos: Optional[Tensor] = None,ToMe=False):
         if self.normalize_before:
             return self.forward_pre(src, src_mask, src_key_padding_mask, pos)
-        return self.forward_post(src, src_mask, src_key_padding_mask, pos)
+        return self.forward_post(src, src_mask, src_key_padding_mask, pos,ToMe=ToMe)
 
 
 class TransformerDecoderLayer(nn.Module):

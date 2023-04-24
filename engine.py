@@ -8,10 +8,12 @@ import sys
 from typing import Iterable
 
 import torch
-
+import time
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
 from datasets.panoptic_eval import PanopticEvaluator
+from thop import profile
+
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -68,9 +70,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, output_dir):
     model.eval()
     criterion.eval()
-
+    start_time = time.time()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # metric_logger.add_meter('Time_taken', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Test:'
 
     iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
@@ -84,15 +87,23 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
             data_loader.dataset.ann_folder,
             output_dir=os.path.join(output_dir, "panoptic_eval"),
         )
-
+    Total_time=0
+    coun=0
     for samples, targets in metric_logger.log_every(data_loader, 10, header):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
+        start_time = time.time()
         outputs = model(samples)
+        time_taken=time.time()-start_time
+        if coun==0:
+            print("flops_counting")
+            flops, _ = profile(model, inputs=(samples,), verbose=False)
+            coun+=1
+            print(f"FLOPS: {flops/1e9} GigaFLOPS") 
+        Total_time+=time_taken
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
-
+        # metric_logger.update(time_taken=time_taken)
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         loss_dict_reduced_scaled = {k: v * weight_dict[k]
@@ -122,7 +133,8 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
                 res_pano[i]["file_name"] = file_name
 
             panoptic_evaluator.update(res_pano)
-
+    print(f"FLOPS: {flops/1e9} GigaFLOPS") 
+    print("Total time taken for evaluation is ",Total_time)
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)

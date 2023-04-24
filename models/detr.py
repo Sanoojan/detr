@@ -61,6 +61,9 @@ class DETR(nn.Module):
         features, pos = self.backbone(samples)
 
         src, mask = features[-1].decompose()
+        if True in mask:
+            print("True in mask .................................")  
+    
         assert mask is not None
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
 
@@ -331,6 +334,7 @@ def build(args):
         aux_loss=args.aux_loss,
     )
     #DC5
+    print("loading pretrained model.....................................")
     if args.backbone == 'resnet50':
         path_to_load="/nfs/users/ext_sanoojan.baliah/Sanoojan/detr/pretrained/detr-r50-dc5-f0fb7ef5.pth" # for res50
     elif args.backbone == 'resnet101':
