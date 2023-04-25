@@ -5,6 +5,10 @@ DETR model and criterion classes.
 import torch
 import torch.nn.functional as F
 from torch import nn
+from thop import profile
+from fvcore.nn import FlopCountAnalysis
+from fvcore.nn import ActivationCountAnalysis
+from torchinfo import summary
 
 from util import box_ops
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
@@ -40,6 +44,7 @@ class DETR(nn.Module):
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
         self.aux_loss = aux_loss
+        self.count=0
 
     def forward(self, samples: NestedTensor):
         """ The forward expects a NestedTensor, which consists of:
@@ -58,13 +63,19 @@ class DETR(nn.Module):
         """
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
+        
+            
         features, pos = self.backbone(samples)
 
         src, mask = features[-1].decompose()
-        if True in mask:
-            print("True in mask .................................")  
     
         assert mask is not None
+        # if self.count==0:
+        #     flops, _ = profile(self.transformer, inputs=(self.input_proj(src), mask, self.query_embed.weight, pos[-1]), verbose=False)
+        #     print(f"Transformer FLOPS: {flops/1e9} GigaFLOPS") 
+            # Flops_analysis = FlopCountAnalysis(self.transformer, (self.input_proj(src), mask, self.query_embed.weight, pos[-1]))
+            # print("Transformer flop analysis total:",Flops_analysis.total())
+            # print(print(summary(model, input_data=[self.input_proj(src), mask, self.query_embed.weight, pos[-1]])))
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
 
         outputs_class = self.class_embed(hs)

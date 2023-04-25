@@ -12,18 +12,13 @@
 # fuser -k 29500/tcp
 
 
-# CUDA_VISIBLE_DEVICES=9 /nfs/users/ext_cvgroup-9/miniconda3/envs/cv703/bin/python  main.py \
-#     --batch_size 2 \
-#     --no_aux_loss \
-#     --eval \
-#     --resume /nfs/users/ext_sanoojan.baliah/Sanoojan/detr/Outputs/baseline/checkpoint0299.pth \
-#     --isaid_path /nfs/projects/cv703/jazz-cvgroup-9 \
-#     --output_dir ./Outputs/Eval/Baseline > Out_eval_final/Baseline_b2.out
-
-
-CUDA_VISIBLE_DEVICES=13 /nfs/users/ext_cvgroup-9/miniconda3/envs/cv703/bin/python  benchmark.py \
-    --resume /nfs/users/ext_sanoojan.baliah/Sanoojan/detr/Outputs/baseline/checkpoint0299.pth 
-
+CUDA_VISIBLE_DEVICES=9 /nfs/users/ext_cvgroup-9/miniconda3/envs/cv703/bin/python  main.py \
+    --batch_size 2 \
+    --no_aux_loss \
+    --eval \
+    --resume /nfs/users/ext_sanoojan.baliah/Sanoojan/detr/Outputs/baseline/checkpoint0299.pth \
+    --isaid_path /nfs/projects/cv703/jazz-cvgroup-9 \
+    --output_dir ./Outputs/Eval/tome_b2_250_last > Out_eval_final/tome_b2_250_last.out
 
 # CUDA_VISIBLE_DEVICES=5 /nfs/users/ext_cvgroup-9/miniconda3/envs/cv703/bin/python -m torch.distributed.launch --nproc_per_node=1 --use_env main.py \
 #     --batch_size 4 \

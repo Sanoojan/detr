@@ -80,9 +80,10 @@ class TransformerEncoder(nn.Module):
 
         for i,layer in enumerate(self.layers):
             if i==5:
-                ToMe=False
+                ToMe=True
             else:
-                ToMe=False
+                ToMe=True
+            
             output,pos = layer(output, src_mask=mask,
                            src_key_padding_mask=src_key_padding_mask, pos=pos,ToMe=ToMe)
 
@@ -197,7 +198,7 @@ class TransformerEncoderLayer(nn.Module):
             # print("before_token_merge",src.shape)
             metric=src
             # r = self._tome_info["r"].pop(0)
-            r=160
+            r=32
             if r > 0:
                 # Apply ToMe here
                 merge, _ = bipartite_soft_matching(

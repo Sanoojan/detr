@@ -13,8 +13,9 @@ import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
 from datasets.panoptic_eval import PanopticEvaluator
 from thop import profile
-
-
+from fvcore.nn import FlopCountAnalysis
+from fvcore.nn import ActivationCountAnalysis
+from torchinfo import summary
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -87,10 +88,12 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
             data_loader.dataset.ann_folder,
             output_dir=os.path.join(output_dir, "panoptic_eval"),
         )
-    Total_time=0
+    Total_time= 0
     coun=0
     for samples, targets in metric_logger.log_every(data_loader, 10, header):
         samples = samples.to(device)
+        if coun==0:
+            print(summary(model, input_size=samples.decompose()[0].size()))
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         start_time = time.time()
         outputs = model(samples)
@@ -98,6 +101,9 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         if coun==0:
             print("flops_counting")
             flops, _ = profile(model, inputs=(samples,), verbose=False)
+            # breakpoint()
+            # Flops_analysis = FlopCountAnalysis(model, (samples.decompose()))
+            # print(Flops_analysis.total())
             coun+=1
             print(f"FLOPS: {flops/1e9} GigaFLOPS") 
         Total_time+=time_taken
@@ -134,6 +140,11 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
 
             panoptic_evaluator.update(res_pano)
     print(f"FLOPS: {flops/1e9} GigaFLOPS") 
+    # print("Total_flop_count", Flops_analysis.total())
+    # print(Flops_analysis.by_operator())
+    # print("Flops by module")
+    # print(Flops_analysis.by_module())
+    
     print("Total time taken for evaluation is ",Total_time)
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
