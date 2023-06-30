@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "main.py", line 256, in <module>
+    main(args)
+  File "main.py", line 107, in main
+    utils.init_distributed_mode(args)
+  File "/nfs/users/ext_sanoojan.baliah/Sanoojan/detr_baseline/util/misc.py", line 426, in init_distributed_mode
+    torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+  File "/nfs/users/ext_cvgroup-9/miniconda3/envs/cv703/lib/python3.8/site-packages/torch/distributed/distributed_c10d.py", line 754, in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+  File "/nfs/users/ext_cvgroup-9/miniconda3/envs/cv703/lib/python3.8/site-packages/torch/distributed/rendezvous.py", line 243, in _env_rendezvous_handler
+    master_addr = _get_env_or_raise("MASTER_ADDR")
+  File "/nfs/users/ext_cvgroup-9/miniconda3/envs/cv703/lib/python3.8/site-packages/torch/distributed/rendezvous.py", line 221, in _get_env_or_raise
+    raise _env_error(env_var)
+ValueError: Error initializing torch.distributed using env:// rendezvous: environment variable MASTER_ADDR expected, but not set

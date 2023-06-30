@@ -9,14 +9,14 @@ from torch import nn
 from util import box_ops
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
                        accuracy, get_world_size, interpolate,
-                       is_dist_avail_and_initialized)
+                       is_dist_avail_and_initialized,load_weights_from_defromDETR)
 
 from .backbone import build_backbone
 from .matcher import build_matcher
 from .segmentation import (DETRsegm, PostProcessPanoptic, PostProcessSegm,
                            dice_loss, sigmoid_focal_loss)
 from .transformer import build_transformer
-
+import pdb
 
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection """
@@ -61,6 +61,7 @@ class DETR(nn.Module):
         features, pos = self.backbone(samples)
 
         src, mask = features[-1].decompose()
+        # pdb.set_trace()
         assert mask is not None
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
 
@@ -310,12 +311,22 @@ def build(args):
     # you should pass `num_classes` to be 2 (max_obj_id + 1).
     # For more details on this, check the following discussion
     # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
-    num_classes = 20 if args.dataset_file != 'coco' else 91
+    
+    num_classes = 16 if args.dataset_file != 'coco' else 91 # Sanoojan: issue with loading classes
+    # num_classes = 91
     if args.dataset_file == "coco_panoptic":
         # for panoptic, we just add a num_classes that is large enough to hold
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
     device = torch.device(args.device)
+    
+    
+    # num_classes = 20 if args.dataset_file != 'coco' else 91
+    # if args.dataset_file == "coco_panoptic":
+    #     # for panoptic, we just add a num_classes that is large enough to hold
+    #     # max_obj_id + 1, but the exact value doesn't really matter
+    #     num_classes = 250
+    # device = torch.device(args.device)
 
     backbone = build_backbone(args)
 
@@ -328,6 +339,15 @@ def build(args):
         num_queries=args.num_queries,
         aux_loss=args.aux_loss,
     )
+    
+    print("loading pretrained model.....................................")
+    if args.backbone == 'resnet50':
+        path_to_load="/nfs/users/ext_sanoojan.baliah/Sanoojan/detr/pretrained/detr-r50-dc5-f0fb7ef5.pth" # for res50
+    elif args.backbone == 'resnet101':
+        path_to_load="/nfs/users/ext_sanoojan.baliah/Sanoojan/detr/pretrained/detr-r101-dc5-a2e86def.pth" # for res101
+    model=load_weights_from_defromDETR(path_to_load, model,remove_weight=['class_embed'])  
+    print("loaded pretrained model.....................................")
+    
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
     matcher = build_matcher(args)

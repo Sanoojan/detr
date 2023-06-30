@@ -1,0 +1,8 @@
+| distributed init (rank 5): tcp://localhost:29501
+| distributed init (rank 4): tcp://localhost:29501
+| distributed init (rank 6): tcp://localhost:29501
+| distributed init (rank 2): tcp://localhost:29501
+| distributed init (rank 0): tcp://localhost:29501
+| distributed init (rank 7): tcp://localhost:29501
+| distributed init (rank 3): tcp://localhost:29501
+| distributed init (rank 1): tcp://localhost:29501
